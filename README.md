@@ -1,4 +1,5 @@
-# GarminAiWorkout
+# GarminWorkoutAItoJSON
+
 Use ChatGPT to create sport workout plan, paste into the generator and import JSON File to Garmin Connect as Workout with one of this tools :
 
 https://chromewebstore.google.com/detail/odgdfpclpfmmemajpmgfipfdfmjgihac
