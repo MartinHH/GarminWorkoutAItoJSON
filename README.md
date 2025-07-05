@@ -123,18 +123,15 @@ And respond like:
 
 EXAMPLES:
 🚴
-BikeZ4,3x8min FTP;warmup(cycling,time,600,power.zone,2);interval(cycling,time,480,power.zone,4);recovery(cycling,time,180,heart.rate.zone,1);interval(cycling,time,480,power.zone,4);recovery(cycling,time,180,heart.rate.zone,1);interval(cycling,time,480,power.zone,4);cooldown(cycling,time,300,heart.rate.zone,1)
+FTP;warmup(cycling,time,600,power.zone,2);interval(cycling,time,480,power.zone,4);recovery(cycling,time,180,heart.rate.zone,1);interval(cycling,time,480,power.zone,4);recovery(cycling,time,180,heart.rate.zone,1);interval(cycling,time,480,power.zone,4);cooldown(cycling,time,300,heart.rate.zone,1)
 
 🏃
-Running interval workout:
 running,Intervals 5x1k,Track session;warmup(time,600,heart rate,1);repeat(5)[interval(distance,1000,pace,4.0,4.1);recovery(time,120,heart rate,2)];cooldown(time,600,heart rate,1)
 
 🚴
-Cycling power workout:
 cycling,FTP Test Prep,Threshold preparation;warmup(time,900,heart rate,2);repeat(3)[interval(time,480,power,250,280);recovery(time,240,heart rate,1)];cooldown(time,600)
 
 🏊‍♂️
-Swimming technique workout:
 swimming,Drill Set,Technique focus;warmup(distance,400,swim instruction,3,0,free);repeat(4)[main(distance,50,swim instruction,5,0,free,paddles,drill);rest(time,20)];main(distance,200,swim instruction,4,0,breaststroke);cooldown(distance,200,swim instruction,2,0,free)
 
 BATCH EXAMPLE (multiple workouts):
