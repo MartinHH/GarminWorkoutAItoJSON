@@ -23,3 +23,9 @@ Just return the line to copy/paste, NO extra explanation or formatting—only th
 Expected example:
 
 10 x 400 Threshold Repeat,Threshold interval session;warmup(time,600,1);repeat(10)[interval(distance,400,4);recovery(time,60,1)];cooldown(time,600,1)
+
+Once the JSON file download, you can upload it on garmin connect with this tools :
+
+https://chromewebstore.google.com/detail/odgdfpclpfmmemajpmgfipfdfmjgihac
+https://chromewebstore.google.com/detail/kdpolhnlnkengkmfncjdbfdehglepmff
+https://chromewebstore.google.com/detail/eifpkcoofcgpichllembbenjkfcgnfde
