@@ -39,37 +39,9 @@
 <body>
 <div class="container">
   <h1>Garmin Workout Generator</h1>
-  <!--
-  <div class="inputmode-group">
-    <label><input type="radio" name="inputmode" value="classic" class="modern-radio" >Classic Form</label>
-    <label><input type="radio" name="inputmode" value="batch" class="modern-radio" checked >Batch (paragraph/line by line)</label>
-  </div>-->
 
-  <div id="classicForm"class="hidden">
-    <label style="font-weight:600;color:#838494;">Select your sport</label>
-    <div class="sport-cards" id="sportsCards"></div>
-    <div><label for="inputName">Workout name</label>
-      <input id="inputName" class="modern-in" placeholder="Workout name" value="My Training"/>
-    </div>
-    <div><label for="inputDesc">Workout description</label>
-      <input id="inputDesc" class="modern-in" placeholder="Description" value="Intervals & more"/>
-    </div>
-    <div class="steps-block">
-      <label id="stepsLabel"></label>
-      <textarea id="inputSteps" class="modern-in" rows="4"></textarea>
-    </div>
-    <code class="example">
-      Example:<br>
-      <b>Running/Cycling/Strength/Cardio:</b><br>
-      warmup(time,600,1)<br>
-      repeat(4)[interval(time,300,power,180,230,recovery,90);recovery(time,90)]<br>
-      cooldown(time,300,1)<br>
-      <b>Swimming:</b><br>
-      main(distance,200,swim instruction,5,0,free,fins,kick)<br>
-      rest(time,30)<br>
-      cooldown(time,300,swim css offset,0,0,breaststroke,kickboard,pull)
-    </code>
-  </div>
+
+  
 
   <div id="batchForm" >
     <label for="multiInput">Paste your workouts here (one per line)</label>
@@ -87,8 +59,8 @@ swim,SwimTest,Crawl only;main(distance,250,swim instruction,5,0,free);rest(time,
   </div>
 
   <button id="generateBtn" class="modern-btn">Generate</button>
-  <button id="downloadBtn" class="modern-btn" disabled>Download JSON</button>
-  <button id="downloadAllBtn" class="modern-btn" disabled>Download All JSONs</button>
+
+  <button id="downloadAllBtn" class="modern-btn" disabled>Download</button>
 
   <div id="multiPreview"></div>
   <div class="steps-preview" id="stepsPreview" style="display:none"></div>
@@ -177,56 +149,129 @@ function parseExecutableStep(stepStr, order, stepId, sportTypeKey = "running") {
   const stepTypeRaw = stepStr.split("(")[0].trim().toLowerCase();
   const st = stepTypeMap[stepTypeRaw];
   if (!st) throw new Error("Unknown or unsupported step type: '" + stepTypeRaw + "'");
+
   const paramsMatch = stepStr.match(/\((.*)\)/);
   const params = paramsMatch ? paramsMatch[1].split(",").map(p => p.trim()) : [];
+
   const condKey = params[0] ? params[0].toLowerCase() : null;
   const cond = conditionTypeMap[condKey] || conditionTypeMap.lap;
-  let endValue = (cond.conditionTypeKey === "lap.button")?null:(params[1] === undefined || params[1] === "null"?null:Number(params[1]));
+  const endValue = (cond.conditionTypeKey === "lap.button") ? null :
+                   (params[1] === undefined || params[1] === "null") ? null : Number(params[1]);
 
-  // ---------- PRINCIPAL TARGET (pace, power, ... avec gestion de l'unité) ----------
-  let targetType = null, targetValueOne = null, targetValueTwo = null;
+  let targetType = null, targetValueOne = null, targetValueTwo = null, zoneNumber = null;
+
   if (sportTypeKey !== "swimming" && params.length > 2 && params[2]) {
-    let mainTarget = params[2].toLowerCase();
-    if (mainTarget === "pace" && params[3] && params[4]) {
-        targetType = TARGET_TYPE_MAPPING["pace"];
-        // Convert min/km → m/s
-        targetValueOne = 1000/(parseFloat(params[3])*60);
-        targetValueTwo = 1000/(parseFloat(params[4])*60);
-        // (option: arrondir 6-8 décimales)
-    } else if (mainTarget === "power" && params[3] && params[4]) {
-      targetType = TARGET_TYPE_MAPPING["power"];
-      targetValueOne = parseFloat(params[3]);
-      targetValueTwo = parseFloat(params[4]);
+    const mainTarget = params[2].toLowerCase();
+
+    // Zone fréquence cardiaque (1–5)
+    if (mainTarget === "heart rate" && params[3]) {
+      const zone = parseInt(params[3]);
+      if (zone >= 1 && zone <= 5 && !params[4]) {
+        targetType = {
+          workoutTargetTypeId: 4,
+          workoutTargetTypeKey: "heart.rate.zone",
+          displayOrder: 4
+        };
+        zoneNumber = zone;
+      } else {
+        // BPM personnalisé
+        const bpm1 = parseInt(params[3]);
+        const bpm2 = params[4] ? parseInt(params[4]) : bpm1;
+        targetType = {
+          workoutTargetTypeId: 4,
+          workoutTargetTypeKey: "heart.rate.zone",
+          displayOrder: 4
+        };
+        targetValueOne = bpm1;
+        targetValueTwo = bpm2;
+      }
+
+    // Zone puissance (1–5)
+} else if (mainTarget === "power" && params[3]) {
+  const power = parseInt(params[3]);
+  const isCycling = sportTypeKey === "cycling";
+  const zoneMax = isCycling ? 7 : 5;
+
+  if (params.length < 5 && power >= 1 && power <= zoneMax) {
+    // Cas zone
+    targetType = {
+      workoutTargetTypeId: 2,
+      workoutTargetTypeKey: "power.zone",
+      displayOrder: 2
+    };
+    zoneNumber = power;
+  } else {
+    // Cas plage personnalisée
+    const power2 = params[4] ? parseInt(params[4]) : power;
+    targetType = {
+      workoutTargetTypeId: 2,
+      workoutTargetTypeKey: "power.zone",
+      displayOrder: 2
+    };
+    targetValueOne = power;
+    targetValueTwo = power2;
+  }
+
+
+
+    // Allure (pace)
+    } else if (mainTarget === "pace" && params[3] && params[4]) {
+      targetType = {
+        workoutTargetTypeId: 6,
+        workoutTargetTypeKey: "pace.zone",
+        displayOrder: 6
+      };
+      targetValueOne = 1000 / (parseFloat(params[3]) * 60); // min/km → m/s
+      targetValueTwo = 1000 / (parseFloat(params[4]) * 60);
+
+    // Cadence
+    } else if (mainTarget === "cadence" && params[3] && params[4]) {
+      targetType = {
+        workoutTargetTypeId: 3,
+        workoutTargetTypeKey: "cadence",
+        displayOrder: 3
+      };
+      targetValueOne = parseInt(params[3]);
+      targetValueTwo = parseInt(params[4]);
+    
+        // Speed
+
     } else if (mainTarget === "speed" && params[3] && params[4]) {
-      targetType = TARGET_TYPE_MAPPING["speed"];
-      // km/h → m/s
-      targetValueOne = parseFloat(params[3]) / 3.6;
-      targetValueTwo = parseFloat(params[4]) / 3.6;
-    } else if (mainTarget === "heart rate" && params[3]) {
-      targetType = TARGET_TYPE_MAPPING["heart rate"];
-      targetValueOne = Number(params[3]);
-      targetValueTwo = params[4] ? Number(params[4]) : null;
-    } else if (mainTarget && TARGET_TYPE_MAPPING[mainTarget]) {
-      targetType = TARGET_TYPE_MAPPING[mainTarget];
-      targetValueOne = params[3] ? Number(params[3]) : null;
-      targetValueTwo = params[4] ? Number(params[4]) : null;
+
+      targetType = {
+        workoutTargetTypeId: 5,
+        workoutTargetTypeKey: "speed.zone",
+        displayOrder: 5
+      };
+      targetValueOne = parseInt(params[3])/3.6;
+      targetValueTwo = parseInt(params[4])/3.6;
     }
   }
-  if (!targetType) targetType = TARGET_TYPE_MAPPING['no target'];
 
-  // ---------- NATATION ----------
-  let strokeType = null, equipmentType = null, drillType = null;
+  if (!targetType) {
+    targetType = {
+      workoutTargetTypeId: 1,
+      workoutTargetTypeKey: "no.target",
+      displayOrder: 1
+    };
+  }
+
+  // NATATION (valeurs par défaut toujours incluses)
+  let strokeType = { strokeTypeId: 0, strokeTypeKey: null, displayOrder: 0 };
+  let equipmentType = { equipmentTypeId: 0, equipmentTypeKey: null, displayOrder: 0 };
+  let drillType = null;
+
   if (sportTypeKey === "swimming") {
     if (params.length >= 6 && params[5]) {
-      let strokeKey = params[5].toLowerCase();
-      strokeType = STROKE_TYPE_MAPPING[strokeKey] || null;
+      const strokeKey = params[5].toLowerCase();
+      strokeType = STROKE_TYPE_MAPPING[strokeKey] || strokeType;
     }
     if (params.length >= 7 && params[6]) {
-      let eqKey = params[6].toLowerCase();
-      equipmentType = EQUIPMENT_TYPE_MAPPING[eqKey] || null;
+      const eqKey = params[6].toLowerCase();
+      equipmentType = EQUIPMENT_TYPE_MAPPING[eqKey] || equipmentType;
     }
     if (params.length >= 8 && params[7]) {
-      let drillKey = params[7].toLowerCase();
+      const drillKey = params[7].toLowerCase();
       drillType = DRILL_TYPE_MAPPING[drillKey] || null;
     }
   }
@@ -235,21 +280,31 @@ function parseExecutableStep(stepStr, order, stepId, sportTypeKey = "running") {
   if (cond.conditionTypeKey === "distance") {
     unitPref = { unitId: 1, unitKey: "meter", factor: 100 };
   }
+
   return {
     type: "ExecutableStepDTO",
     stepId,
     stepOrder: order,
-    stepType: { stepTypeId: st.stepTypeId, stepTypeKey: stepTypeRaw, displayOrder: st.displayOrder },
+    stepType: {
+      stepTypeId: st.stepTypeId,
+      stepTypeKey: stepTypeRaw,
+      displayOrder: st.displayOrder
+    },
     childStepId: null,
     description: null,
-    endCondition: { conditionTypeId: cond.conditionTypeId, conditionTypeKey: cond.conditionTypeKey, displayOrder: cond.displayOrder, displayable: true },
+    endCondition: {
+      conditionTypeId: cond.conditionTypeId,
+      conditionTypeKey: cond.conditionTypeKey,
+      displayOrder: cond.displayOrder,
+      displayable: true
+    },
     endConditionValue: endValue,
     preferredEndConditionUnit: unitPref,
     endConditionCompare: null,
     targetType,
     targetValueOne,
     targetValueTwo,
-    zoneNumber: null,
+    zoneNumber,
     secondaryTargetType: null,
     secondaryTargetValueOne: null,
     secondaryTargetValueTwo: null,
@@ -345,7 +400,11 @@ function parseAllWorkoutsFromMultiInput() {
   if (firstSemi === -1) throw new Error("Line missing steps: " + line);
   const head = line.substring(0, firstSemi);
   const stepsText = line.substring(firstSemi + 1);
-  const [sportKey, wname, wdesc] = head.split(",").map(x=>x.trim());
+  const headParts = head.split(",").map(x => x.trim());
+const sportKey = headParts[0];
+const wname = headParts[1] || "";
+const wdesc = headParts[2] || "";
+const poolLengthStr = headParts[3]; // facultatif
   if (!sportKey || !SPORT_TYPE_MAPPING[sportKey.toLowerCase()]) throw new Error(`Unknown or unsupported sport type in line: ${line}`);
   const sport = SPORT_TYPE_MAPPING[sportKey.toLowerCase()];
   const stepsArr = splitSteps(stepsText);
@@ -361,7 +420,10 @@ function parseAllWorkoutsFromMultiInput() {
   wkt.workoutSegments[0].sportType = { ...sport };
   wkt.workoutSegments[0].workoutSteps = parseSteps(stepsArr, 1, sport.sportTypeKey);
   if (sport.sportTypeKey === "swimming") {
-    wkt.poolLength = 25; wkt.poolLengthUnit = { unitId: 1, unitKey: "meter", factor: 100 };
+    
+    const poolLengthVal = poolLengthStr ? parseInt(poolLengthStr, 10) : 25;
+  wkt.poolLength = poolLengthVal;
+  wkt.poolLengthUnit = { unitId: 1, unitKey: "meter", factor: 100 };
   }
   estimateStats(wkt.workoutSegments[0], sportKey);
   wkt.avgTrainingSpeed = wkt.workoutSegments[0].avgTrainingSpeed;
@@ -373,68 +435,14 @@ function parseAllWorkoutsFromMultiInput() {
 }
   return workouts;
 }
-function humanStepOut(step) {
-  if (step.type === "RepeatGroupDTO") {
-    let inside = step.workoutSteps.map(humanStepOut).join(", ");
-    return `Repeat x${step.numberOfIterations}: [${inside}]`;
-  }
-  let desc = step.stepType.stepTypeKey.charAt(0).toUpperCase()+step.stepType.stepTypeKey.slice(1);
-  let what = "";
-  if (step.endCondition && step.endCondition.conditionTypeKey)
-    what += step.endCondition.conditionTypeKey === "lap.button"
-      ? "to lap" : (step.endCondition.conditionTypeKey+" "+(step.endConditionValue!=null?step.endConditionValue:""));
-  if (step.targetType && step.targetType.workoutTargetTypeKey !== "no.target") {
-    what += " ("+step.targetType.workoutTargetTypeKey;
-    what += ")";
-  }
-  return desc + (what ? " - "+what : "");
-}
 
-//--- Classic mode UI
-const sportsCardsDiv = document.getElementById("sportsCards");
-let selectedSport = SPORTS[0].key;
-function renderSportsCards() {
-  sportsCardsDiv.innerHTML = "";
-  SPORTS.forEach(sport => {
-    const div = document.createElement("div");
-    div.className = "sport-card" + (selectedSport===sport.key ? " selected" : "");
-    div.innerHTML = `<span class="sport-emoji">${sport.emoji}</span><div class="sport-label">${sport.label}</div>`;
-    div.onclick = function(){
-      selectedSport=sport.key; renderSportsCards(); updateBlock(); };
-    sportsCardsDiv.appendChild(div);
-  });
-  updateBlock();
-}
-function updateBlock() {
-  const label = SPORTS.find(s=>s.key===selectedSport).label;
-  const emoji = SPORTS.find(s=>s.key===selectedSport).emoji;
-  document.getElementById("stepsLabel").textContent = emoji + " " + label + " steps";
-  document.getElementById("inputSteps").value = defaultStepsForSport(selectedSport);
-}
-function defaultStepsForSport(key) {
-  if (key === "swim") return "main(distance,200,swim instruction,5,0,free)";
-  if (key === "bike") return "warmup(time,300,1)\ninterval(time,600,power,150,220)";
-  if (key === "strength"||key==="cardio") return "interval(time,60,1)";
-  return "warmup(time,300,1)";
-}
-renderSportsCards();
-//--- Mode switch UI logic
-let inputMode = "batch";
-document.querySelectorAll('input[name="inputmode"]').forEach(inp=>{
-  inp.addEventListener("change",function(){
-    inputMode = this.value;
-    document.getElementById("classicForm").classList.toggle("hidden",inputMode!=="batch");
-    document.getElementById("batchForm").classList.toggle("hidden",inputMode!=="batch");
-    document.getElementById("downloadAllBtn").classList.toggle("hidden",inputMode!=="batch");
-    document.getElementById("downloadBtn").classList.toggle("hidden",inputMode!=="batch");
-    document.getElementById("stepsPreview").style.display = "none";
-    document.getElementById("multiPreview").innerHTML = "";
-    document.getElementById("outputJson").textContent = "";
-  });
-});
+
+
+
+
+
 //--- Génération/Download
 const generateBtn = document.getElementById("generateBtn");
-const downloadBtn = document.getElementById("downloadBtn");
 const downloadAllBtn = document.getElementById("downloadAllBtn");
 const outputEl = document.getElementById("outputJson");
 let lastJSON = null;
@@ -442,102 +450,58 @@ let lastWorkouts = null;
 
 generateBtn.addEventListener("click", () => {
   try {
-    if(inputMode==="classic"){
-      stepIdCounter = 7316001338;
-      const sportKey = selectedSport, info = SPORTS.find(s=>s.key===sportKey), sport = SPORT_TYPE_MAPPING[sportKey] || SPORT_TYPE_MAPPING.run;
-      const name = document.getElementById("inputName").value;
-      const desc = document.getElementById("inputDesc").value;
-      const stepsStr = document.getElementById("inputSteps").value || "";
-      const stepsArr = stepsStr.split("\n").map(x => x.trim()).filter(Boolean);
+    lastWorkouts = [];
+    stepIdCounter = 7316001338;
+    const lines = document.getElementById("multiInput").value.split("\n").map(l=>l.trim()).filter(Boolean);
+    for (let line of lines) {
+      if (!line) continue;
+      const firstSemi = line.indexOf(";");
+      if (firstSemi === -1) throw new Error("Line missing steps: " + line);
+      const head = line.substring(0, firstSemi);
+      const stepsText = line.substring(firstSemi + 1);
+      const headParts = head.split(",").map(x => x.trim());
+const sportKey = headParts[0];
+const wname = headParts[1] || "";
+const wdesc = headParts[2] || "";
+const poolLengthStr = headParts[3]; // facultatif
+      if (!sportKey || !SPORT_TYPE_MAPPING[sportKey.toLowerCase()]) throw new Error(`Unknown or unsupported sport type in line: ${line}`);
+      const sport = SPORT_TYPE_MAPPING[sportKey.toLowerCase()];
+      const stepsArr = splitSteps(stepsText);
       const wkt = JSON.parse(JSON.stringify(garminTemplate));
-      wkt.workoutName = (name || "Workout") + " " + (info.emoji || "") + " - " + new Date().toString();
-      wkt.description = desc ;//? desc + " - Exported at " + new Date().toISOString() : null;
       const ownerId = parseInt(randomIntString(9), 10);
       const userProfilePk = parseInt(randomIntString(9), 10);
       const workoutId = parseInt(randomIntString(10), 10);
+      wkt.workoutName = (wname || "Workout");
+      wkt.description = (wdesc || "");
       wkt.ownerId = ownerId; wkt.workoutId = workoutId; wkt.author.userProfilePk = userProfilePk;
-      wkt.sportType = { ...sport }; wkt.workoutSegments[0].sportType = {...sport};
+      wkt.sportType = { ...sport };
+      wkt.workoutSegments[0].sportType = { ...sport };
       wkt.workoutSegments[0].workoutSteps = parseSteps(stepsArr, 1, sport.sportTypeKey);
       if (sport.sportTypeKey === "swimming") {
-        wkt.poolLength = 25; wkt.poolLengthUnit = { unitId: 1, unitKey: "meter", factor: 100 };
-      }
+  const poolLengthVal = poolLengthStr ? parseInt(poolLengthStr, 10) : 25;
+  wkt.poolLength = poolLengthVal;
+  wkt.poolLengthUnit = { unitId: 1, unitKey: "meter", factor: 100 };
+}
       estimateStats(wkt.workoutSegments[0], sportKey);
       wkt.avgTrainingSpeed = wkt.workoutSegments[0].avgTrainingSpeed;
       wkt.estimateType = wkt.workoutSegments[0].estimateType;
       wkt.estimatedDurationInSecs = wkt.workoutSegments[0].estimatedDurationInSecs;
       wkt.estimatedDistanceInMeters = wkt.workoutSegments[0].estimatedDistanceInMeters;
       wkt.estimatedDistanceUnit = wkt.workoutSegments[0].estimatedDistanceUnit;
-      displayPreview(wkt.workoutSegments[0].workoutSteps);
-      lastJSON = JSON.stringify(wkt, null, 2);
-      outputEl.textContent = lastJSON;
-      downloadBtn.disabled = false;
-      downloadAllBtn.disabled = true;
-    }else{
-      lastWorkouts = [];
-      stepIdCounter = 7316001338;
-      const lines = document.getElementById("multiInput").value.split("\n").map(l=>l.trim()).filter(Boolean);
-      for (let line of lines) {
-        if (!line) continue;
-        const firstSemi = line.indexOf(";");
-        if (firstSemi === -1) throw new Error("Line missing steps: " + line);
-        const head = line.substring(0, firstSemi);
-        const stepsText = line.substring(firstSemi + 1);
-        const [sportKey, wname, wdesc] = head.split(",").map(x=>x.trim());
-        if (!sportKey || !SPORT_TYPE_MAPPING[sportKey.toLowerCase()]) throw new Error(`Unknown or unsupported sport type in line: ${line}`);
-        const sport = SPORT_TYPE_MAPPING[sportKey.toLowerCase()];
-        const stepsArr = splitSteps(stepsText);
-        const stepsParsed = parseSteps(stepsArr, 1, sport.sportTypeKey);
-        const wkt = JSON.parse(JSON.stringify(garminTemplate));
-        const ownerId = parseInt(randomIntString(9), 10);
-        const userProfilePk = parseInt(randomIntString(9), 10);
-        const workoutId = parseInt(randomIntString(10), 10);
-        wkt.workoutName = (wname || "Workout") //+ " - " + new Date().toLocaleString("sv-SE");
-        wkt.description = (wdesc || "") //+ " - Exported at " + new Date().toISOString();
-        wkt.ownerId = ownerId; wkt.workoutId = workoutId; wkt.author.userProfilePk = userProfilePk;
-        wkt.sportType = { ...sport };
-        wkt.workoutSegments[0].sportType = { ...sport };
-        wkt.workoutSegments[0].workoutSteps = parseSteps(stepsArr, 1, sport.sportTypeKey);
-        if (sport.sportTypeKey === "swimming") {
-          wkt.poolLength = 25; wkt.poolLengthUnit = { unitId: 1, unitKey: "meter", factor: 100 };
-        }
-        estimateStats(wkt.workoutSegments[0], sportKey);
-        wkt.avgTrainingSpeed = wkt.workoutSegments[0].avgTrainingSpeed;
-        wkt.estimateType = wkt.workoutSegments[0].estimateType;
-        wkt.estimatedDurationInSecs = wkt.workoutSegments[0].estimatedDurationInSecs;
-        wkt.estimatedDistanceInMeters = wkt.workoutSegments[0].estimatedDistanceInMeters;
-        wkt.estimatedDistanceUnit = wkt.workoutSegments[0].estimatedDistanceUnit;
-        lastWorkouts.push({ json: JSON.stringify(wkt, null, 2), name: wname || `Workout_${sport.sportTypeKey}` });
-      }
-      outputEl.textContent = lastWorkouts.length === 1 ? lastWorkouts[0].json :
-        lastWorkouts.map((w,idx)=>`---- Workout ${idx+1} ----\n${w.json}`).join("\n\n");
-      previewAllSteps(lastWorkouts);
-      downloadBtn.disabled = true;
-      downloadAllBtn.disabled = false;
+      lastWorkouts.push({ json: JSON.stringify(wkt, null, 2), name: wname || `Workout_${sport.sportTypeKey}` });
     }
+    outputEl.textContent = lastWorkouts.length === 1 ? lastWorkouts[0].json :
+      lastWorkouts.map((w,idx)=>`---- Workout ${idx+1} ----\n${w.json}`).join("\n\n");
+    previewAllSteps(lastWorkouts);
+    
+    downloadAllBtn.disabled = false;
   } catch (e) {
     outputEl.textContent = "Error: " + e.message;
-    downloadBtn.disabled = true;
+    
     downloadAllBtn.disabled = true;
     document.getElementById("stepsPreview").style.display = "none";
     document.getElementById("multiPreview").innerHTML = "";
   }
-});
-downloadBtn.addEventListener("click", () => {
-  if (!lastJSON) return;
-  let workoutName = "garmin_workout";
-  try {
-    const obj = JSON.parse(lastJSON);
-    workoutName = obj.workoutName
-      ? obj.workoutName.replace(/[^\w\-]+/g,"_")
-      : "garmin_workout";
-  } catch(e) {}
-  const blob = new Blob([lastJSON], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = workoutName + ".json";
-  a.click();
-  URL.revokeObjectURL(url);
 });
 downloadAllBtn.addEventListener("click", async () => {
   if (!lastWorkouts || !lastWorkouts.length) return;
@@ -569,13 +533,39 @@ downloadAllBtn.addEventListener("click", async () => {
 // Preview
 function previewAllSteps(workouts) {
   const preview = document.getElementById("multiPreview");
-  preview.innerHTML = workouts.map((w,idx)=>{
+  preview.innerHTML = workouts.map((w, idx) => {
     const obj = JSON.parse(w.json);
-    const steps = obj.workoutSegments[0].workoutSteps;
-    return `<div class="steps-preview"><h3>${obj.workoutName} (${obj.sportType.sportTypeKey})</h3>${
-      steps.map((s,i)=>`<div class="step-line">${i+1}. ${humanStepOut(s)}</div>`).join("")
-    }</div>`;
+    const rawSteps = obj.workoutSegments[0].workoutSteps;
+    const jsonId = `jsonWorkout${idx}`;
+    const btnId = `btnCopy${idx}`;
+
+    // Affichage brut (JSON.stringify formaté en ligne)
+    const rawStepsHtml = `<code class="example">${JSON.stringify(rawSteps, null, 2)}</code>`;
+
+    return `
+      <div class="steps-preview">
+        <h3>${obj.workoutName} (${obj.sportType.sportTypeKey})</h3>
+        ${rawStepsHtml}
+        <button class="modern-btn" id="${btnId}" style="margin-top:12px;margin-bottom:4px;">Copy JSON to clipboard</button>
+        <textarea id="${jsonId}" class="hidden">${w.json}</textarea>
+      </div>
+    `;
   }).join("");
+
+  workouts.forEach((w, idx) => {
+    const btn = document.getElementById(`btnCopy${idx}`);
+    const jsonField = document.getElementById(`jsonWorkout${idx}`);
+    if (btn && jsonField) {
+      btn.addEventListener("click", () => {
+        jsonField.classList.remove("hidden");
+        jsonField.select();
+        document.execCommand("copy");
+        jsonField.classList.add("hidden");
+        btn.textContent = "Copied!";
+        setTimeout(() => btn.textContent = "Copy JSON to clipboard", 1800);
+      });
+    }
+  });
 }
 function displayPreview(steps) {
   const preview = document.getElementById("stepsPreview");
