@@ -47,6 +47,7 @@ Each step must start with a **condition**:
 - `time` → in seconds (e.g. `time,600`)
 - `distance` → in meters (e.g. `distance,1000`)
 - `lap` → user presses lap button
+- `fixed` → for swimming rest intervals by "send-off time" (e.g.`fixed,80`)
 
 ---
 
